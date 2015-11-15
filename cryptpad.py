@@ -31,16 +31,16 @@ class AuthenticationError(Exception):
     pass
 
 
-def encrypt(data, key):
+def encrypt(data, Ek, Ak):
     """Encrypt then MAC"""
 
     ## encrypt
 
     clear = StringIO(data)
 
-    print("key is length %d" % len(key))
+    print("Ek is length %d" % len(Ek))
     iv = ''.join(chr(randint(0, 0xFF)) for i in range(16))
-    encryptor = AES.new(key, AES.MODE_CBC, iv)
+    encryptor = AES.new(Ek, AES.MODE_CBC, iv)
 
     clear.seek(0)
     crypted = StringIO()
@@ -58,7 +58,7 @@ def encrypt(data, key):
 
     ## then mac
 
-    h = HMAC.new(key, crypted.getvalue(), digestmod=SHA256)
+    h = HMAC.new(Ak, crypted.getvalue(), digestmod=SHA256)
     crypted.write(h.digest())
     crypted.seek(0)
 
@@ -69,7 +69,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     currentDocument = None
     autoSaveTimer = None
     dataSinceLastSave = ''
-    key = None
+    Ekey = None
+    Akey = None
 
     def __init__(self):
 
@@ -113,7 +114,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.saveDocument()
         elif res == QMessageBox.Discard:
             self.textEdit.setPlainText("")
-            self.changesMade = False
             self.key = None
         else:
             return ## cancel new doc
@@ -129,11 +129,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.encryptThenSave(fileName)
         
     def encryptThenSave(self, fileName):
-        if not self.key:
-            self.key = self.promptEncrytptionPhrase()
+        if not self.Ekey:
+            self.Ekey, self.Akey = self.promptEncrytptionPhrase()
 
         doc = self.textEdit.toPlainText()
-        enc = encrypt(doc, self.key)
+        enc = encrypt(doc, self.Ekey, self.Akey)
 
         with open(fileName, 'wb') as outFile:
             shutil.copyfileobj(enc, outFile)
@@ -142,9 +142,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.statusbar.showMessage("Save complete.", 3000)
 
     def decryptThenOpen(self, fileName):
-        key = self.promptEncrytptionPhrase()
+        Ek, Ak = self.promptEncrytptionPhrase()
         
-        if not key:
+        if not Ek:
             return
 
         with open(fileName, 'rb') as inFile:
@@ -155,7 +155,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             data = crypted[:-MAC_SIZE]
 
             mac = crypted[-MAC_SIZE:]
-            real_mac = HMAC.new(key, data, SHA256).digest()
+            real_mac = HMAC.new(Ak, data, SHA256).digest()
             if mac != real_mac:
                 retval = QMessageBox.critical(self, "Authentication Error", "HMAC signature in file does not match acutal HMAC.<br>"
                     "Either you entered the wrong passphrase, or the file has been tampered with.<br><br>"
@@ -165,7 +165,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             ## auth passed, prepare for decryption
             iv = crypted[:16]
-            decryptor = AES.new(key, AES.MODE_CBC, iv)
+            decryptor = AES.new(Ek, AES.MODE_CBC, iv)
             decrypted = StringIO()
             handle = StringIO(crypted[16:-MAC_SIZE])
 
@@ -183,7 +183,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             QLineEdit.Password, "")
 
         if ok:
-            return SHA256.new(phrase.encode()).digest()
+            Ek = SHA256.new(phrase.encode()).digest()
+            Ak = SHA256.new(Ek).digest()
+
+            return Ek, Ak
 
     def closeEvent(self, event):
         res = self.promptSaveChanges()

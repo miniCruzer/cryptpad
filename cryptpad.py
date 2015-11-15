@@ -38,7 +38,6 @@ def get_signature(data, Ak):
 
     return HMAC.new(Ak, data, digestmod=SHA256).digest()
 
-
 def encrypt(data, Ek, Ak):
     """Encrypt then MAC"""
 
@@ -113,8 +112,7 @@ def decrypt(crypted, Ek, Ak):
 
 def mkpasswd(phrase):
     Ek = SHA256.new(phrase.encode()).digest()
-    Ak = SHA256.new(Ek).digest()
-
+    Ak = bcrypt.hashpw(phrase, bcrypt.gensalt())
     return Ek, Ak
 
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -199,32 +197,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return
 
         with open(fileName, 'rb') as inFile:
-
-            #key = self.promptEncrytptionPhrase()
             crypted = inFile.read()
 
-            data = crypted[:-MAC_SIZE]
-
-            mac = crypted[-MAC_SIZE:]
-            real_mac = HMAC.new(Ak, data, SHA256).digest()
-            if mac != real_mac:
-                retval = QMessageBox.critical(self, "Authentication Error", "HMAC signature in file does not match acutal HMAC.<br>"
-                    "Either you entered the wrong passphrase, or the file has been tampered with.<br><br>"
-                    "Would you like to attempt to decrypt anyway?", QMessageBox.Yes | QMessageBox.No)
-                if retval == QMessageBox.No:
-                    return
-
-            ## auth passed, prepare for decryption
-            iv = crypted[:BLOCK_SIZE]
-            decryptor = AES.new(Ek, AES.MODE_CBC, iv)
-            decrypted = StringIO()
-            handle = StringIO(crypted[BLOCK_SIZE:-MAC_SIZE])
-
-            while True:
-                chunk = handle.read(BLOCK_SIZE)
-                if len(chunk) < BLOCK_SIZE:
-                    break
-                decrypted.write(decryptor.decrypt(chunk))
+        try:
+            decrypted = decrypt(crypted, Ek, Ak)
+        except AuthenticationError:
+            QMessageBox.critical(self, "Authentication Failed",
+                "Either you entered the wrong passphrase or the requested data has been tampered with.")
+            return
 
         self.textEdit.setPlainText(decrypted.getvalue())
 

@@ -1,1 +1,5 @@
-README
+# Cryptpad
+A plain text editor that encrypts documents before storing them on the disk.
+
+## Authenticated Encryption
+Cryptpad uses Encrypt-then-MAC to verify the authenticity of the file being opened. Users receive a warning if the authentication fails. In the future this will probably be removed, and the application will not open files that don't authenticate properly.

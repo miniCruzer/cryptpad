@@ -64,38 +64,6 @@ def encrypt(data, key):
 
     return crypted
 
-def decrypt(self, handle, key):
-    
-    ## get IV
-    iv = handle.read(16)
-
-    ## get MAC signature
-    handle.seek(-16, os.SEEK_END)
-    mac = handle.read(16)
-
-    ## verify
-    data = handle.read(os.SEEK_END)
-    if SHA256.new(data).digest() != mac:
-        raise AuthenticationError("Data is corrupt or has been tampered with.")
-
-    handle.seek(0)
-
-    ## decrypt
-    handle.seek(0)
-
-    decryptor = AES.new(key, AES.MODE_CBC, iv)
-
-    decrypted = StringIO()
-    while True:
-
-        chunk = handle.read(16)
-        if len(chunk) < 16:
-            break
-        decrypted.write(decryptor.decrypt(chunk))
-
-    decrypted.seek(0)
-    return decrypted
-
 class MainWindow(QMainWindow, Ui_MainWindow):
 
     currentDocument = None

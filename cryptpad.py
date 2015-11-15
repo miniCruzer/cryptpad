@@ -32,11 +32,20 @@ BIG_ENDIAN_SIZE = struct.calcsize('Q')
 class AuthenticationError(Exception):
     pass
 
+def compare_digest(a, b):
+    if len(a) != len(b):
+        return False
+    res = 0
+    for x, y in zip(a, b):
+        res |= ord(x) ^ ord(y)
+
+    return res == 0
+
 def get_signature(data, Ak):
     """ returns HMAC-SHA256 signature for supplied data
     using supplied key """
-
-    return HMAC.new(Ak, data, digestmod=SHA256).digest()
+    h = HMAC.new(Ak, data, digestmod=SHA256)
+    return h.digest()
 
 def encrypt(data, Ek, Ak):
     """Encrypt then MAC"""
@@ -85,8 +94,12 @@ def decrypt(crypted, Ek, Ak):
     data = crypted[:-MAC_SIZE]
 
     mac = crypted[-MAC_SIZE:]
-    real_mac = HMAC.new(Ak, data, SHA256).digest()
-    if mac != real_mac:
+    assert(len(mac) == MAC_SIZE)
+
+    real_mac = get_signature(data, Ak)
+    assert(len(real_mac) == MAC_SIZE)
+
+    if not compare_digest(mac, real_mac):
         raise AuthenticationError("Authentication failed.")
 
     ## auth passed, prepare for decryption
@@ -112,7 +125,7 @@ def decrypt(crypted, Ek, Ak):
 
 def mkpasswd(phrase):
     Ek = SHA256.new(phrase.encode()).digest()
-    Ak = bcrypt.hashpw(phrase, bcrypt.gensalt())
+    Ak = SHA256.new(Ek).digest()
     return Ek, Ak
 
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -161,9 +174,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         res = self.promptSaveChanges()
         if res == QMessageBox.Save:
             self.saveDocument()
+            self.textEdit.setPlainText("")
+            self.Akey = None
+            self.Ekey = None
+            self.currentDocument = None
         elif res == QMessageBox.Discard:
             self.textEdit.setPlainText("")
-            self.key = None
+            self.Akey = None
+            self.Ekey = None
+            self.currentDocument = None
         else:
             return ## cancel new doc
 
@@ -178,10 +197,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.encryptThenSave(fileName)
         
     def encryptThenSave(self, fileName):
-        if not self.Ekey:
+        if not self.Ekey or not self.Akey:
             self.Ekey, self.Akey = self.promptEncrytptionPhrase()
 
         doc = self.textEdit.toPlainText()
+        self.dataSinceLastSave = doc
         enc = encrypt(doc, self.Ekey, self.Akey)
 
         with open(fileName, 'wb') as outFile:
@@ -207,6 +227,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return
 
         self.textEdit.setPlainText(decrypted.getvalue())
+        self.Ekey = Ek
+        self.Akey = Ak
+        self.currentDocument = fileName
 
     def promptEncrytptionPhrase(self):
 
@@ -214,7 +237,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             QLineEdit.Password, "")
 
         if ok:
-            return mkpasswd(phrase)
+            return mkpasswd(phrase.encode())
 
     def closeEvent(self, event):
         res = self.promptSaveChanges()

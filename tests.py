@@ -1,7 +1,7 @@
 import unittest
 
 from cryptpad import encrypt, decrypt, mkpasswd, get_signature, MAC_SIZE, AuthenticationError
-import bcrypt
+
 test_data = "<avenj> Goodnight, NSA."
 test_pass = "P3rl!"
 
@@ -15,13 +15,16 @@ class TestEncryption(unittest.TestCase):
 	def test_mkpasswd_authentication_key(self):
 
 		Ek, Ak = mkpasswd(test_pass)
-		self.assertTrue(bcrypt.hashpw(test_pass, Ak) == Ak)
+		self.assertEqual('6^\x9b\xc5\xdb\xfd\x80\xe89g\xcec4V\x81\xc4\xff\xf3&\xc9\x92\x81\xc2\xe4<U\x10S\t\x12\x93\xf1', Ak)
 
 	def test_decrypt_succeeds(self):
 
 		Ek, Ak = mkpasswd(test_pass)
 
 		encrypted_data = encrypt(test_data, Ek, Ak).getvalue()
+
+		Ek, Ak = mkpasswd(test_pass)
+
 		decrypted_data = decrypt(encrypted_data, Ek, Ak).getvalue()
 
 		self.assertEqual(decrypted_data, test_data)

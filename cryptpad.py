@@ -84,12 +84,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.actionNew.triggered.connect(self.newDocument)
         self.textEdit.textChanged.connect(self.changesMade)
         self.actionOpen.triggered.connect(self.openDocument)
+        self.actionFont.triggered.connect(self.selectFont)
 
     def changesMade(self):
         """triggered when text is changed"""
         if self.textEdit.toPlainText() != self.dataSinceLastSave:
             return True
         return False
+
+    def selectFont(self):
+        self.textEdit.setFont(QFontDialog.getFont(self.textEdit.font(), self)[0])
 
     def saveDocument(self):
         if self.currentDocument == None:
@@ -156,7 +160,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 retval = QMessageBox.critical(self, "Authentication Error", "HMAC signature in file does not match acutal HMAC.<br>"
                     "Either you entered the wrong passphrase, or the file has been tampered with.<br><br>"
                     "Would you like to attempt to decrypt anyway?", QMessageBox.Yes | QMessageBox.No)
-
                 if retval == QMessageBox.No:
                     return
 

@@ -121,7 +121,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def saveDocumentAs(self):
         fileName = QFileDialog.getSaveFileName(self, "Save As")
-        self.encryptThenSave(fileName)
+        if fileName:
+            self.encryptThenSave(fileName)
         
     def encryptThenSave(self, fileName):
         if not self.key:
@@ -152,9 +153,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             mac = crypted[-MAC_SIZE:]
             real_mac = HMAC.new(key, data, SHA256).digest()
             if mac != real_mac:
-                QMessageBox.critical(self, "Authentication Error", "HMAC signature in file does not match acutal HMAC.<br>" 
-                    "Either you entered the wrong passphrase, or the file has been tampered with.")
-                raise AuthenticationError("HMAC of file does not match actual HMAC.")
+                retval = QMessageBox.critical(self, "Authentication Error", "HMAC signature in file does not match acutal HMAC.<br>"
+                    "Either you entered the wrong passphrase, or the file has been tampered with.<br><br>"
+                    "Would you like to attempt to decrypt anyway?", QMessageBox.Yes | QMessageBox.No)
+
+                if retval == QMessageBox.No:
+                    return
 
             ## auth passed, prepare for decryption
             iv = crypted[:16]

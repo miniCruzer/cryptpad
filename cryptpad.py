@@ -8,7 +8,7 @@ import sip
 sip.setapi("QString", 2)
 sip.setapi("QVariant", 2)
 
-import sys, os, shutil
+import sys, os, shutil, struct
 
 try:
     from cStringIO import StringIO 
@@ -25,10 +25,18 @@ import bcrypt
 
 from ui_cryptpad import Ui_MainWindow
 
+BLOCK_SIZE = 16
 MAC_SIZE = SHA256.digest_size
+BIG_ENDIAN_SIZE = struct.calcsize('Q')
 
 class AuthenticationError(Exception):
     pass
+
+def get_signature(data, Ak):
+    """ returns HMAC-SHA256 signature for supplied data
+    using supplied key """
+
+    return HMAC.new(Ak, data, digestmod=SHA256).digest()
 
 
 def encrypt(data, Ek, Ak):
@@ -38,31 +46,76 @@ def encrypt(data, Ek, Ak):
 
     clear = StringIO(data)
 
-    print("Ek is length %d" % len(Ek))
-    iv = ''.join(chr(randint(0, 0xFF)) for i in range(16))
+    iv = ''.join(chr(randint(0, 0xFF)) for i in range(BLOCK_SIZE))
+    assert(len(iv) == 16)
     encryptor = AES.new(Ek, AES.MODE_CBC, iv)
 
     clear.seek(0)
     crypted = StringIO()
 
+    crypted.write(struct.pack('>Q', len(data)))
     crypted.write(iv)
+
     while True:
-        chunk = clear.read(16)
+        chunk = clear.read(BLOCK_SIZE)
 
         if len(chunk) == 0:
             break
-        elif len(chunk) % 16 != 0:
-            chunk += ' ' * (16 - len(chunk) % 16)
-
+        elif len(chunk) % BLOCK_SIZE != 0:
+            chunk += ' ' * (BLOCK_SIZE - len(chunk) % BLOCK_SIZE)
+ 
         crypted.write(encryptor.encrypt(chunk))
 
     ## then mac
 
-    h = HMAC.new(Ak, crypted.getvalue(), digestmod=SHA256)
-    crypted.write(h.digest())
+    crypted.write(get_signature(crypted.getvalue(), Ak))
     crypted.seek(0)
 
     return crypted
+
+def decrypt(crypted, Ek, Ak):
+
+    """crypted -> String of encrypted data that contains the IV at the first 16 bits,
+    and the Auth Key at the end. Returns a StringIO of the decrypted data.
+
+    Errors: raises AuthenticationError if the calculated HMAC-SHA256 does not equal the
+    one stored at the end of the crypted string."""
+
+    ## PTSize || IV || EncryptedData || MAC
+
+    data = crypted[:-MAC_SIZE]
+
+    mac = crypted[-MAC_SIZE:]
+    real_mac = HMAC.new(Ak, data, SHA256).digest()
+    if mac != real_mac:
+        raise AuthenticationError("Authentication failed.")
+
+    ## auth passed, prepare for decryption
+
+    size = struct.unpack('>Q', crypted[:BIG_ENDIAN_SIZE])[0]
+    
+    iv = crypted[BIG_ENDIAN_SIZE:BIG_ENDIAN_SIZE + BLOCK_SIZE] 
+    
+    assert(len(iv) == 16)
+
+    decryptor = AES.new(Ek, AES.MODE_CBC, iv)
+    decrypted = StringIO()
+    handle = StringIO(crypted[BLOCK_SIZE + BIG_ENDIAN_SIZE:-MAC_SIZE])
+
+    while True:
+        chunk = handle.read(BLOCK_SIZE)
+        if len(chunk) < BLOCK_SIZE:
+            break
+        decrypted.write(decryptor.decrypt(chunk))
+
+    decrypted.truncate(size)
+    return decrypted
+
+def mkpasswd(phrase):
+    Ek = SHA256.new(phrase.encode()).digest()
+    Ak = SHA256.new(Ek).digest()
+
+    return Ek, Ak
 
 class MainWindow(QMainWindow, Ui_MainWindow):
 
@@ -88,7 +141,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.actionFont.triggered.connect(self.selectFont)
 
     def changesMade(self):
-        """triggered when text is changed"""
         if self.textEdit.toPlainText() != self.dataSinceLastSave:
             return True
         return False
@@ -105,7 +157,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def openDocument(self):
         fileName = QFileDialog.getOpenFileName(self, "Open File")
         if fileName:
-
             self.decryptThenOpen(fileName)
 
     def newDocument(self):
@@ -164,14 +215,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     return
 
             ## auth passed, prepare for decryption
-            iv = crypted[:16]
+            iv = crypted[:BLOCK_SIZE]
             decryptor = AES.new(Ek, AES.MODE_CBC, iv)
             decrypted = StringIO()
-            handle = StringIO(crypted[16:-MAC_SIZE])
+            handle = StringIO(crypted[BLOCK_SIZE:-MAC_SIZE])
 
             while True:
-                chunk = handle.read(16)
-                if len(chunk) < 16:
+                chunk = handle.read(BLOCK_SIZE)
+                if len(chunk) < BLOCK_SIZE:
                     break
                 decrypted.write(decryptor.decrypt(chunk))
 
@@ -183,10 +234,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             QLineEdit.Password, "")
 
         if ok:
-            Ek = SHA256.new(phrase.encode()).digest()
-            Ak = SHA256.new(Ek).digest()
-
-            return Ek, Ak
+            return mkpasswd(phrase)
 
     def closeEvent(self, event):
         res = self.promptSaveChanges()

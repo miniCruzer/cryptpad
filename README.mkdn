@@ -4,11 +4,11 @@ A plain text editor that encrypts documents before storing them on the disk.
 ## Authenticated Encryption
 Cryptpad uses Encrypt-then-MAC to verify the authenticity of the file being opened. Users receive a warning if the authentication fails. In the future this will probably be removed, and the application will not open files that don't authenticate properly.
 
-## Yikes, Raw SHA256 hash as the encryption key?
-This would only be a problem if Cryptpad stored the encryption key anywhere. But it does not store any keys, or passwords to the disk. If the password is lost, so is the data that was encrypted with that password.
+## Yikes, raw SHA256 hash as the encryption key?
+This would only be a problem if Cryptpad stored the encryption key anywhere. But it does not store any keys, or passwords to the disk. If the password is lost, so is the data that was encrypted with that password. If you modify this software to store the key, switch to [bcrypt](https://pypi.python.org/pypi/py-bcrypt) instead.
 
 ## Why don't you use an existing crypto suite?
-I could, but I'm only using symmmetric-key cryptography.
+I could, but I'm only using symmmetric-key cryptography. This is not a home-grown technique.
 
 This software employs the following Symmetric-Key techniques and avoids the following mistakes (hyperlinks cite source code):
 * authenticated encryption
@@ -17,3 +17,11 @@ This software employs the following Symmetric-Key techniques and avoids the foll
 * [random IV](https://github.com/miniCruzer/cryptpad/blob/master/cryptpad.py#L57) for CBC mode
 * [not using a human-readable password](https://github.com/miniCruzer/cryptpad/blob/master/cryptpad.py#L127)
 * [does not use the same key for encryption and message authentication](https://github.com/miniCruzer/cryptpad/blob/master/cryptpad.py#L128)
+
+## The Encryption Process
+First 8 bytes of the file contains an Unsigned Big Endian - this is the original size of the file. The size is Authenticated Data.
+The next 16 bytes of the file contains the IV. The IV is AUthenticated Data.
+The last 32 bytes of the file contains the MAC used to authenticate the file. The MAC is not authenticated data ... obviously.
+
+The Encryption Key is a SHA256 digest of the password.
+The Authentication Key is a SHA256 digest of the Encryption Key: `Ek = sha256(passwd); Ak = sha256(Ek)`

@@ -19,9 +19,9 @@ This software employs the following Symmetric-Key techniques and avoids the foll
 * [does not use the same key for encryption and message authentication](https://github.com/miniCruzer/cryptpad/blob/master/cryptpad.py#L128)
 
 ## The Encryption Process
-First 8 bytes of the file contains an Unsigned Big Endian - this is the original size of the file. The size is Authenticated Data.
-The next 16 bytes of the file contains the IV. The IV is AUthenticated Data.
-The last 32 bytes of the file contains the MAC used to authenticate the file. The MAC is not authenticated data ... obviously.
+1. First 8 bytes of the file contains an Unsigned Big Endian - this is the original size of the file. The size is Authenticated Data.
+2. The next 16 bytes of the file contains the IV. The IV is AUthenticated Data.
+3. The last 32 bytes of the file contains the MAC used to authenticate the file. The MAC is not authenticated data ... obviously.
 
-The Encryption Key is a SHA256 digest of the password.
-The Authentication Key is a SHA256 digest of the Encryption Key: `Ek = sha256(passwd); Ak = sha256(Ek)`
+* The Encryption Key is a SHA256 digest of the password.
+* The Authentication Key is a SHA256 digest of the Encryption Key: `Ek = sha256(passwd); Ak = sha256(Ek)`

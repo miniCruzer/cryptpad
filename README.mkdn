@@ -19,6 +19,7 @@ This software employs the following Symmetric-Key techniques and avoids the foll
 * [random IV](https://github.com/miniCruzer/cryptpad/blob/master/cryptpad.py#L57) for CBC mode
 * [not using a human-readable password](https://github.com/miniCruzer/cryptpad/blob/master/cryptpad.py#L127)
 * [does not use the same key for encryption and message authentication](https://github.com/miniCruzer/cryptpad/blob/master/cryptpad.py#L128)
+* [constant time comparison](https://github.com/miniCruzer/cryptpad/blob/master/cryptpad.py#L35) instead of "==" when verifying MACs.
 
 ## The Encryption Process
 1. First 8 bytes of the file contains an Unsigned Big Endian - this is the original size of the file. The size is Authenticated Data.

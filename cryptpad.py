@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 ##
 ## Copyright (C) 2015 Samuel Hoffman
@@ -55,7 +56,7 @@ def encrypt(data, Ek, Ak):
     clear = StringIO(data)
 
     iv = ''.join(chr(randint(0, 0xFF)) for i in range(BLOCK_SIZE))
-    assert(len(iv) == 16)
+
     encryptor = AES.new(Ek, AES.MODE_CBC, iv)
 
     clear.seek(0)
@@ -94,10 +95,8 @@ def decrypt(crypted, Ek, Ak):
     data = crypted[:-MAC_SIZE]
 
     mac = crypted[-MAC_SIZE:]
-    assert(len(mac) == MAC_SIZE)
 
     real_mac = get_signature(data, Ak)
-    assert(len(real_mac) == MAC_SIZE)
 
     if not compare_digest(mac, real_mac):
         raise AuthenticationError("Authentication failed.")
@@ -107,8 +106,6 @@ def decrypt(crypted, Ek, Ak):
     size = struct.unpack('>Q', crypted[:BIG_ENDIAN_SIZE])[0]
     
     iv = crypted[BIG_ENDIAN_SIZE:BIG_ENDIAN_SIZE + BLOCK_SIZE] 
-    
-    assert(len(iv) == 16)
 
     decryptor = AES.new(Ek, AES.MODE_CBC, iv)
     decrypted = StringIO()

@@ -3,3 +3,17 @@ A plain text editor that encrypts documents before storing them on the disk.
 
 ## Authenticated Encryption
 Cryptpad uses Encrypt-then-MAC to verify the authenticity of the file being opened. Users receive a warning if the authentication fails. In the future this will probably be removed, and the application will not open files that don't authenticate properly.
+
+## Yikes, Raw SHA256 hash as the encryption key?
+This would only be a problem if Cryptpad stored the encryption key anywhere. But it does not store any keys, or passwords to the disk. If the password is lost, so is the data that was encrypted with that password.
+
+## Why don't you use an existing crypto suite?
+I could, but I'm only using symmmetric-key cryptography.
+
+This software employs the following Symmetric-Key techniques and avoids the following mistakes (hyperlinks cite source code):
+* authenticateed encryption
+* [Encrypt-then-MAC](https://github.com/miniCruzer/cryptpad/blob/master/cryptpad.py#L50) construction
+* does not use (ECB mode)[https://github.com/miniCruzer/cryptpad/blob/master/cryptpad.py#L59]
+* [random IV](https://github.com/miniCruzer/cryptpad/blob/master/cryptpad.py#L57) for CBC mode
+* [not using a human-readable password](https://github.com/miniCruzer/cryptpad/blob/master/cryptpad.py#L127)
+* [does not use the same key for encryption and message authentication](https://github.com/miniCruzer/cryptpad/blob/master/cryptpad.py#L128)

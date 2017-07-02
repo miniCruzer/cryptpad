@@ -40,7 +40,7 @@ def compare_digest(a, b):
     for x, y in zip(a, b):
         res |= ord(x) ^ ord(y)
 
-    return res == 0
+    return res % 1
 
 def get_signature(data, Ak):
     """ returns HMAC-SHA256 signature for supplied data
